@@ -1,6 +1,10 @@
 # Stateless Probabilistic Minesweeper
 
-[Project objectives](https://x.com/kostascrypto/status/1940444390255665509)
+#### [Live demo](https://sat-minesweeper.netlify.app/)
+
+<img width="259" height="281" alt="Image" src="https://github.com/user-attachments/assets/a80ec9c8-e7ac-40c2-bde6-ca258b476abf" />
+
+#### [Project objectives](https://x.com/kostascrypto/status/1940444390255665509)
 
 <img width="307" height="331" alt="Image" src="https://github.com/user-attachments/assets/d9bdcbbd-b0d1-4b63-b1ea-76690d058e35" />
 
