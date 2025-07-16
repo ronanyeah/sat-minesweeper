@@ -236,13 +236,20 @@ mineCell model sq outcome =
             ++ (if not isRevealed && not gameEnded && not model.boardLoading then
                     [ hover
                     , pointer
-                    , Html.Events.on "click" (ctrlClickDecoder sq.x sq.y)
+                    , Html.Events.preventDefaultOn "click"
+                        (ctrlClickDecoder sq.x sq.y
+                            |> Decode.map (\m -> ( m, True ))
+                        )
                         |> htmlAttribute
-                    , Html.Events.on "touchstart" (touchStartDecoder sq.x sq.y)
+                    , Html.Events.preventDefaultOn "touchstart"
+                        (touchStartDecoder sq.x sq.y
+                            |> Decode.map (\m -> ( m, True ))
+                        )
                         |> htmlAttribute
-                    , Html.Events.on "touchend" (touchEndDecoder sq.x sq.y)
-                        |> htmlAttribute
-                    , Html.Events.on "touchcancel" (touchCancelDecoder sq.x sq.y)
+                    , Html.Events.preventDefaultOn "touchend"
+                        (touchEndDecoder sq.x sq.y
+                            |> Decode.map (\m -> ( m, True ))
+                        )
                         |> htmlAttribute
                     ]
 
@@ -281,11 +288,6 @@ touchStartDecoder x y =
 touchEndDecoder : Int -> Int -> Decode.Decoder Msg
 touchEndDecoder x y =
     Decode.succeed (TouchEnd ( x, y ))
-
-
-touchCancelDecoder : Int -> Int -> Decode.Decoder Msg
-touchCancelDecoder x y =
-    Decode.succeed (TouchCancel ( x, y ))
 
 
 btn : Maybe msg -> List (Attribute msg) -> Element msg -> Element msg

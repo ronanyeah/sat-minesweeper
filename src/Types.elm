@@ -26,7 +26,6 @@ type Msg
     | RestartGame
     | TouchStart ( Int, Int )
     | TouchEnd ( Int, Int )
-    | TouchCancel ( Int, Int )
     | TouchHoldComplete ( Int, Int )
 
 

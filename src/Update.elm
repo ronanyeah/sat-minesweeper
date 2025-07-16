@@ -157,9 +157,6 @@ update msg model =
                 Nothing ->
                     ( model, Cmd.none )
 
-        TouchCancel _ ->
-            ( { model | touchHoldTimer = Nothing }, Cmd.none )
-
         TouchHoldComplete point ->
             case model.touchHoldTimer of
                 Just holdPoint ->
