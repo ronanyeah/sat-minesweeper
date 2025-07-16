@@ -1,0 +1,12 @@
+[package]
+name = "minesweeper"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+anyhow = "1.0.98"
+bcs = "0.1.6"
+itertools = "0.14.0"
+rand = "0.9.1"
+serde = "1.0.219"
+varisat = "0.2.2"
