@@ -48,6 +48,7 @@ update msg model =
             ( { model
                 | mine = Just x
                 , status = Types.InProgress (Just False)
+                , boardLoading = False
               }
             , Cmd.none
             )
