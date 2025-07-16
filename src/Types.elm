@@ -10,6 +10,7 @@ type alias Model =
     , flags : Set ( Int, Int )
     , mine : Maybe ( Int, Int )
     , gameSettings : GameSettings
+    , touchHoldTimer : Maybe ( Int, Int )
     }
 
 
@@ -23,6 +24,10 @@ type Msg
     | UpdateMines Int
     | StartGame
     | RestartGame
+    | TouchStart ( Int, Int )
+    | TouchEnd ( Int, Int )
+    | TouchCancel ( Int, Int )
+    | TouchHoldComplete ( Int, Int )
 
 
 type GameStatus

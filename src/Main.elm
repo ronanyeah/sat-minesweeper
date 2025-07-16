@@ -26,6 +26,7 @@ init _ =
       , status = Types.Standby
       , boardLoading = False
       , gameSettings = { size = 8, mines = 8 }
+      , touchHoldTimer = Nothing
       }
     , Ports.log "app start"
     )

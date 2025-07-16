@@ -111,7 +111,6 @@ impl Game {
     /// 3. Calls the solver to deduce, solve, and sample a valid board state.
     /// 4. Updates the board with the revealed cell and its number.
     /// 5. Triggers a cascading flood fill if a '0' is revealed.
-    /// 6. Checks for a win condition.
     pub fn reveal_cell(&mut self, at: Point) -> anyhow::Result<bool> {
         // --- 1. Pre-checks and Special Cases ---
         if !matches!(self.board[at.y][at.x], Cell::Hidden) {

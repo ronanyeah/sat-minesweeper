@@ -5,12 +5,14 @@ import Element.Background as Background
 import Element.Border as Border
 import Element.Font as Font
 import Element.Input as Input
-import Helpers.View exposing (style, whenAttr)
+import Helpers.View exposing (style, when, whenAttr)
 import Html exposing (Html)
 import Html.Events
 import Json.Decode as Decode
+import Material.Icons as Icons
+import Material.Icons.Types exposing (Icon)
 import Maybe.Extra exposing (unwrap)
-import Set exposing (Set)
+import Set
 import Types exposing (..)
 
 
@@ -78,7 +80,7 @@ initScreen model =
 
 gameView : Model -> Maybe Bool -> Html Msg
 gameView model outcome =
-    [ [ [ "Click to reveal • Ctrl+Click to flag"
+    [ [ [ "Click to reveal • Ctrl+Click to flag (hold on mobile)"
             |> text
         ]
             |> paragraph [ Font.size 14, Font.italic, Font.color (rgb255 100 100 100) ]
@@ -203,26 +205,21 @@ mineCell model sq outcome =
                 rgb255 192 192 192
             )
          , (if isMine then
-                "💥"
+                text "💥"
 
             else
                 sq.mines
                     |> unwrap
-                        (if Set.member ( sq.x, sq.y ) flags then
-                            "🚩"
-
-                         else
-                            ""
+                        (icon Icons.flag 35
+                            |> el [ Font.color (rgb255 255 0 0), centerX, centerY ]
+                            |> when (Set.member ( sq.x, sq.y ) flags)
                         )
                         (\n ->
-                            if n == 0 then
-                                ""
-
-                            else
-                                String.fromInt n
+                            String.fromInt n
+                                |> text
+                                |> when (n /= 0)
                         )
            )
-            |> text
             |> el [ Font.size 35, centerX, centerY ]
             |> inFront
          ]
@@ -240,6 +237,12 @@ mineCell model sq outcome =
                     [ hover
                     , pointer
                     , Html.Events.on "click" (ctrlClickDecoder sq.x sq.y)
+                        |> htmlAttribute
+                    , Html.Events.on "touchstart" (touchStartDecoder sq.x sq.y)
+                        |> htmlAttribute
+                    , Html.Events.on "touchend" (touchEndDecoder sq.x sq.y)
+                        |> htmlAttribute
+                    , Html.Events.on "touchcancel" (touchCancelDecoder sq.x sq.y)
                         |> htmlAttribute
                     ]
 
@@ -270,6 +273,21 @@ ctrlClickDecoder x y =
             )
 
 
+touchStartDecoder : Int -> Int -> Decode.Decoder Msg
+touchStartDecoder x y =
+    Decode.succeed (TouchStart ( x, y ))
+
+
+touchEndDecoder : Int -> Int -> Decode.Decoder Msg
+touchEndDecoder x y =
+    Decode.succeed (TouchEnd ( x, y ))
+
+
+touchCancelDecoder : Int -> Int -> Decode.Decoder Msg
+touchCancelDecoder x y =
+    Decode.succeed (TouchCancel ( x, y ))
+
+
 btn : Maybe msg -> List (Attribute msg) -> Element msg -> Element msg
 btn msg attrs elem =
     Input.button
@@ -287,3 +305,10 @@ hover =
 fade : Element.Attr a b
 fade =
     Element.alpha 0.7
+
+
+icon : Icon msg -> Int -> Element msg
+icon ic n =
+    ic n Material.Icons.Types.Inherit
+        |> Element.html
+        |> el []
