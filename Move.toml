@@ -1,0 +1,14 @@
+[package]
+name = "sweep"
+edition = "2024"
+
+[dependencies]
+grid = { git = "https://github.com/sui-potatoes/app.git", subdir = "packages/grid", rev = "main" }
+Sui = { git = "https://github.com/MystenLabs/sui.git", subdir = "crates/sui-framework/packages/sui-framework", rev = "af5297b292c3" }
+
+[addresses]
+sweep = "0x0"
+
+[dev-dependencies]
+
+[dev-addresses]
