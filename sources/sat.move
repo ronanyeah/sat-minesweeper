@@ -1,7 +1,7 @@
 /// SAT solver implementation using DPLL algorithm for minesweeper constraints
 module sweep::sat;
 
-use grid::point::Point;
+use grid::point::{Self, Point};
 use sui::{random::RandomGenerator, vec_map::{Self, VecMap}};
 
 /// A literal in a SAT clause (variable or its negation)
@@ -727,8 +727,6 @@ fun remove_value<T: copy + drop>(vec: &mut vector<T>, value: &T): bool {
 #[test_only]
 /// Helper for testing - create simple SAT instance
 public fun test_create_simple_instance(): (SATInstance, Point, Point) {
-    use grid::point;
-
     let p1 = point::new(0, 0);
     let p2 = point::new(0, 1);
 
@@ -756,7 +754,7 @@ fun test_simple_sat_solving() {
             assert!(p1_val != p2_val, 0); // XOR: exactly one true
         },
         SATResult::Unsatisfiable => {
-            assert!(false, 1); // Should not be unsatisfiable
+            abort 1 // Should not be unsatisfiable
         },
     }
 }
@@ -789,8 +787,6 @@ fun test_deduction_analysis() {
 
 #[test]
 fun test_sat_instance_creation() {
-    use grid::point;
-
     let p1 = point::new(0, 0);
     let p2 = point::new(0, 1);
     let mut instance = sat_instance_new(vector[p1, p2]);
@@ -806,14 +802,12 @@ fun test_sat_instance_creation() {
         SATResult::Satisfiable(assignment) => {
             assert!(*assignment.get(&p1) == true, 0);
         },
-        SATResult::Unsatisfiable => assert!(false, 1),
+        SATResult::Unsatisfiable => abort 1,
     }
 }
 
 #[test]
 fun test_exactly_k_constraint_k0() {
-    use grid::point;
-
     let p1 = point::new(0, 0);
     let p2 = point::new(0, 1);
     let mut instance = sat_instance_new(vector[p1, p2]);
@@ -831,14 +825,12 @@ fun test_exactly_k_constraint_k0() {
             // Verify global consistency
             assert!(verify_assignment_satisfies_all_constraints(&instance, &assignment), 2);
         },
-        SATResult::Unsatisfiable => assert!(false, 3),
+        SATResult::Unsatisfiable => abort 3,
     }
 }
 
 #[test]
 fun test_stateless_sampling() {
-    use grid::point;
-
     let p1 = point::new(0, 0);
     let p2 = point::new(0, 1);
     let p3 = point::new(1, 0);
@@ -870,8 +862,6 @@ fun test_stateless_sampling() {
 
 #[test]
 fun test_global_consistency_verification() {
-    use grid::point;
-
     let p1 = point::new(0, 0);
     let p2 = point::new(0, 1);
     let mut instance = sat_instance_new(vector[p1, p2]);
@@ -895,8 +885,6 @@ fun test_global_consistency_verification() {
 
 #[test]
 fun test_exactly_k_constraint_all() {
-    use grid::point;
-
     let p1 = point::new(0, 0);
     let p2 = point::new(0, 1);
     let mut instance = sat_instance_new(vector[p1, p2]);
@@ -912,14 +900,12 @@ fun test_exactly_k_constraint_all() {
             assert!(*assignment.get(&p1) == true, 0);
             assert!(*assignment.get(&p2) == true, 1);
         },
-        SATResult::Unsatisfiable => assert!(false, 2),
+        SATResult::Unsatisfiable => abort 2,
     }
 }
 
 #[test]
 fun test_unsatisfiable_instance() {
-    use grid::point;
-
     let p1 = point::new(0, 0);
     let mut instance = sat_instance_new(vector[p1]);
 
@@ -933,15 +919,13 @@ fun test_unsatisfiable_instance() {
     let result = solve_sat(&instance, &mut rng);
 
     match (result) {
-        SATResult::Satisfiable(_) => assert!(false, 0),
+        SATResult::Satisfiable(_) => abort 0,
         SATResult::Unsatisfiable => {}, // Expected
     }
 }
 
 #[test]
 fun test_forced_true_deduction() {
-    use grid::point;
-
     let p1 = point::new(0, 0);
     let p2 = point::new(0, 1);
     let mut instance = sat_instance_new(vector[p1, p2]);
@@ -963,8 +947,6 @@ fun test_forced_true_deduction() {
 
 #[test]
 fun test_forced_false_deduction() {
-    use grid::point;
-
     let p1 = point::new(0, 0);
     let p2 = point::new(0, 1);
     let mut instance = sat_instance_new(vector[p1, p2]);
@@ -986,8 +968,6 @@ fun test_forced_false_deduction() {
 
 #[test]
 fun test_three_variable_exactly_one() {
-    use grid::point;
-
     let p1 = point::new(0, 0);
     let p2 = point::new(0, 1);
     let p3 = point::new(1, 0);
@@ -1010,14 +990,12 @@ fun test_three_variable_exactly_one() {
             };
             assert!(count == 1, 0);
         },
-        SATResult::Unsatisfiable => assert!(false, 1),
+        SATResult::Unsatisfiable => abort 1,
     }
 }
 
 #[test]
 fun test_impossible_constraint() {
-    use grid::point;
-
     let p1 = point::new(0, 0);
     let p2 = point::new(0, 1);
     let mut instance = sat_instance_new(vector[p1, p2]);
@@ -1029,7 +1007,7 @@ fun test_impossible_constraint() {
     let result = solve_sat(&instance, &mut rng);
 
     match (result) {
-        SATResult::Satisfiable(_) => assert!(false, 0),
+        SATResult::Satisfiable(_) => abort 0,
         SATResult::Unsatisfiable => {}, // Expected
     }
 }

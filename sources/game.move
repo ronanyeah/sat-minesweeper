@@ -1,70 +1,89 @@
 /// SAT-based minesweeper game implementation using constraint solving
 module sweep::game;
 
-use grid::{grid::Grid, point::Point};
+use grid::{grid::{Self, Grid}, point::{Self, Point}};
 use sui::random::RandomGenerator;
-use sweep::sat::{Self, SATInstance};
+use sweep::sat;
 
 // --- Game State Enums ---
 
 /// Visual state of each tile from player's perspective
-public enum Tile has copy, drop {
+public enum Tile has copy, drop, store {
     Hidden,
     Revealed(u8),
-}
-
-/// SAT solver tile state for constraint tracking
-public enum SATTile has copy, drop {
-    Unknown,
-    Constrained(u8, u8), // mine_count, constraint_count
-    Deduced(bool), // true = mine, false = safe
 }
 
 // --- Core Game Structures ---
 
 /// Main SAT-based minesweeper game state
-public struct SATMinesweeper has drop {
+public struct SATMinesweeper has key, store {
+    id: UID,
     grid: Grid<Tile>,
-    sat_grid: Grid<SATTile>,
-    sat_instance: SATInstance,
-    rng: RandomGenerator,
     turn: u16,
     mines: u16,
     revealed: u16,
 }
 
+public fun to_string(tile: &Tile): std::string::String {
+    match (tile) {
+        Tile::Revealed(n) => (*n).to_string(),
+        Tile::Hidden => b" ".to_string(),
+    }
+}
+
 // --- Game Initialization ---
 
-#[allow(lint(public_random))]
 /// Create new SAT-based minesweeper game
-public fun new(rng: RandomGenerator, width: u16, height: u16, mines: u16): SATMinesweeper {
-    use grid::{grid, point};
-
-    // Create SAT variables for each grid position
-    let mut sat_variables = vector::empty<Point>();
-    width.do!(|x| {
-        height.do!(|y| {
-            sat_variables.push_back(point::new(x, y));
-        });
-    });
-
+public fun new(size: u16, mines: u16, ctx: &mut TxContext): SATMinesweeper {
+    let id = object::new(ctx);
     SATMinesweeper {
-        grid: grid::tabulate!(width, height, |_, _| Tile::Hidden),
-        sat_grid: grid::tabulate!(width, height, |_, _| SATTile::Unknown),
-        sat_instance: sat::sat_instance_new(sat_variables),
-        rng,
+        id,
+        grid: grid::tabulate!(size, size, |_, _| Tile::Hidden),
         turn: 0,
         mines,
         revealed: 0,
     }
 }
 
+public fun destroy(game: SATMinesweeper) {
+    let SATMinesweeper {
+        id,
+        grid: _,
+        turn: _,
+        mines: _,
+        revealed: _,
+    } = game;
+    object::delete(id);
+}
+
+public fun get_square(game: &SATMinesweeper, x: u16, y: u16): Option<u8> {
+    match (game.grid[x, y]) {
+        Tile::Revealed(n) => option::some(n),
+        Tile::Hidden => option::none(),
+    }
+}
+
+public fun grid(game: &SATMinesweeper): Grid<Tile> {
+    game.grid
+}
+
+public fun turn(game: &SATMinesweeper): u16 {
+    game.turn
+}
+
+public fun revealed(game: &SATMinesweeper): u16 {
+    game.revealed
+}
+
+public fun mines(game: &SATMinesweeper): u16 {
+    game.mines
+}
+
 // --- Game Actions ---
 
+#[allow(lint(public_random))]
 /// Reveal a tile using stateless probabilistic sampling
-public fun reveal(game: &mut SATMinesweeper, x: u16, y: u16): bool {
-    use grid::point;
-
+public fun reveal(game: &mut SATMinesweeper, x: u16, y: u16, rng: &mut RandomGenerator): bool {
     // Check if tile is already revealed
     match (game.grid[x, y]) {
         Tile::Revealed(_) => abort,
@@ -77,10 +96,10 @@ public fun reveal(game: &mut SATMinesweeper, x: u16, y: u16): bool {
     // Generate SAT analysis once for consistency throughout this move
     let analysis = if (is_first_click) {
         let first_move_instance = generate_first_move_constraints(game, x, y);
-        sat::analyze_with_deductions(&first_move_instance, &mut game.rng)
+        sat::analyze_with_deductions(&first_move_instance, rng)
     } else {
         let fresh_instance = generate_constraints_from_visible(game);
-        sat::analyze_with_deductions(&fresh_instance, &mut game.rng)
+        sat::analyze_with_deductions(&fresh_instance, rng)
     };
 
     // Check if this cell is a mine using the consistent analysis
@@ -123,18 +142,20 @@ public fun reveal(game: &mut SATMinesweeper, x: u16, y: u16): bool {
 
     // Auto-reveal safe neighbors if this is a zero
     if (mine_count == 0) {
-        flood_fill_zeros_with_analysis(game, x, y, &analysis);
+        flood_fill_zeros_with_analysis(game, x, y, &analysis, rng);
     };
 
     true // Continue game
 }
 
+public fun render(game: &SATMinesweeper): std::string::String {
+    game.grid.to_string!()
+}
+
 // --- Helper Functions ---
 
 /// Get valid neighbors within grid bounds
-fun get_neighbors(game: &SATMinesweeper, pos: Point): vector<Point> {
-    use grid::point;
-
+public fun get_neighbors(game: &SATMinesweeper, pos: Point): vector<Point> {
     let (x, y) = pos.to_values();
     let mut neighbors = vector::empty<Point>();
     let (width, height) = (game.grid.rows(), game.grid.cols());
@@ -163,9 +184,8 @@ fun flood_fill_zeros_with_analysis(
     x: u16,
     y: u16,
     analysis: &sat::AnalysisResult,
+    rng: &mut RandomGenerator,
 ) {
-    use grid::point;
-
     let pos = point::new(x, y);
     let neighbors = get_neighbors(game, pos);
 
@@ -177,7 +197,7 @@ fun flood_fill_zeros_with_analysis(
                 if (!analysis.sample_assignment_cell_state(neighbor)) {
                     // It's safe - reveal it with a fresh analysis
                     // Note: recursive reveals will generate their own consistent analysis
-                    reveal(game, nx, ny);
+                    reveal(game, nx, ny, rng);
                 }
             },
             _ => (), // Skip already revealed or flagged tiles
@@ -187,8 +207,6 @@ fun flood_fill_zeros_with_analysis(
 
 /// Generate SAT constraints based only on currently visible (revealed) tiles
 fun generate_constraints_from_visible(game: &SATMinesweeper): sat::SATInstance {
-    use grid::point;
-
     // Create fresh SAT instance with all grid positions as variables
     let mut sat_variables = vector::empty<Point>();
     let (width, height) = (game.grid.rows(), game.grid.cols());
@@ -284,8 +302,6 @@ fun generate_first_move_constraints(
     first_click_x: u16,
     first_click_y: u16,
 ): sat::SATInstance {
-    use grid::point;
-
     // Create fresh SAT instance with all grid positions as variables
     let mut sat_variables = vector::empty<Point>();
     let (width, height) = (game.grid.rows(), game.grid.cols());
@@ -334,105 +350,4 @@ fun generate_first_move_constraints(
     );
 
     fresh_instance
-}
-
-// --- Tests ---
-
-#[test]
-fun test_game_initialization() {
-    let rng = sui::random::new_generator_from_seed_for_testing(b"test_seed");
-    let game = new(rng, 3, 3, 2);
-
-    assert!(game.turn == 0, 0);
-    assert!(game.mines == 2, 1);
-    assert!(game.revealed == 0, 2);
-
-    // Check all tiles are initially hidden
-    let (width, height) = (game.grid.rows(), game.grid.cols());
-    width.do!(|x| {
-        height.do!(|y| {
-            match (game.grid[x, y]) {
-                Tile::Hidden => (),
-                _ => assert!(false, 3),
-            }
-        });
-    });
-}
-
-#[test]
-fun test_reveal_tile() {
-    let rng = sui::random::new_generator_from_seed_for_testing(b"test_seed");
-    let mut game = new(rng, 3, 3, 2);
-
-    game.reveal(1, 1); // Reveal center tile
-
-    assert!(game.turn == 1, 0);
-    assert!(game.revealed == 1, 1);
-
-    // Check tile is revealed
-    match (game.grid[1, 1]) {
-        Tile::Revealed(_) => (),
-        _ => assert!(false, 2),
-    }
-}
-
-#[test]
-fun test_get_neighbors_corner() {
-    let rng = sui::random::new_generator_from_seed_for_testing(b"test_seed");
-    let game = new(rng, 3, 3, 2);
-
-    let corner_pos = grid::point::new(0, 0);
-    let neighbors = get_neighbors(&game, corner_pos);
-
-    // Corner should have 3 neighbors
-    assert!(neighbors.length() == 3, 0);
-}
-
-#[test]
-fun test_get_neighbors_center() {
-    let rng = sui::random::new_generator_from_seed_for_testing(b"test_seed");
-    let game = new(rng, 3, 3, 2);
-
-    let center_pos = grid::point::new(1, 1);
-    let neighbors = get_neighbors(&game, center_pos);
-
-    // Center should have 8 neighbors
-    assert!(neighbors.length() == 8, 0);
-}
-
-#[test]
-fun test_get_neighbors_edge() {
-    let rng = sui::random::new_generator_from_seed_for_testing(b"test_seed");
-    let game = new(rng, 3, 3, 2);
-
-    let edge_pos = grid::point::new(1, 0);
-    let neighbors = get_neighbors(&game, edge_pos);
-
-    // Edge should have 5 neighbors
-    assert!(neighbors.length() == 5, 0);
-}
-
-#[test]
-#[expected_failure]
-fun test_reveal_already_revealed() {
-    let rng = sui::random::new_generator_from_seed_for_testing(b"test_seed");
-    let mut game = new(rng, 3, 3, 2);
-
-    game.reveal(1, 1);
-    game.reveal(1, 1); // Should abort
-}
-
-#[test]
-fun test_first_click_safety() {
-    let rng = sui::random::new_generator_from_seed_for_testing(b"test_seed");
-    let mut game = new(rng, 3, 3, 2);
-
-    // First click should never be a mine
-    let result = game.reveal(1, 1);
-    assert!(result == true, 0); // Game should continue
-
-    match (game.grid[1, 1]) {
-        Tile::Revealed(count) => assert!(count < 9, 1), // Should not be a mine (9)
-        _ => assert!(false, 2),
-    }
 }
